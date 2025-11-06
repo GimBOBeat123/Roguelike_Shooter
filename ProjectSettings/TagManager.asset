@@ -3,7 +3,11 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 3
-  tags: []
+  tags:
+  - Door
+  - Floor
+  - Wall
+  - Room
   layers:
   - Default
   - TransparentFX

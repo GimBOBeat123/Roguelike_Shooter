@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 019356b25ab6af64eba84388ad0fe84f
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - sprite: {fileID: 6660783624410144326, guid: 467d1f18998d0c24d80585d2fced5917, type: 3}
+  - weaponPrefab: {instanceID: 0}
+  - bulletPrefab: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

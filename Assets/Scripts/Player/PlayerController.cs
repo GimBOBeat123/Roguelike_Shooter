@@ -1,21 +1,38 @@
-using UnityEngine;
 using System.Collections;
+using UnityEngine;
 
+[RequireComponent(typeof(Rigidbody2D))]
+[RequireComponent(typeof(Animator))]
 public class PlayerController : MonoBehaviour
 {
+    [HideInInspector]
+    public WeaponBase currentWeapon; // 현재 장착된 무기
+
+    [Header("Weapon")]
+    public WeaponHolder weaponHolder;
+
+    [Header("Player Settings")]
+    public float moveSpeed = 5f;
+    public int maxHP = 100;
+
+    [Header("References")]
+    public Transform playerHand;      // 손 위치
+
+    [Header("Debug")]
+    public LayerMask enemyLayer;
+
+    [HideInInspector] public Room currentRoom;
+
     private Rigidbody2D rb;
     private Animator animator;
-    private Vector2 moveInput;
     private SpriteRenderer spriteRenderer;
 
-    public float moveSpeed = 5f; // 플레이어 이동 속도
-    public int maxHP = 100; // 플레이어 최대 체력
-    private int currentHP; // 플레이어 현재 체력
-    public Room currentRoom; // 현재 플레이어가 위치한 방
+    private Vector2 moveInput;
+    private int currentHP;
+    private bool isDead;
+    private bool canMove = true;
 
-    private bool isHit = false; // 플레이어 피해 여부
-    private bool isDead = false; // 플레이어 사망 여부
-    private bool canMove = true; // 방 이동 중 이동 제한용
+    private float originalHandX;
 
     void Start()
     {
@@ -23,110 +40,224 @@ public class PlayerController : MonoBehaviour
         animator = GetComponent<Animator>();
         spriteRenderer = GetComponent<SpriteRenderer>();
         currentHP = maxHP;
+
+        if (WeaponManager.Instance.defaultWeapon != null)
+        {
+            WeaponManager.Instance.AddWeapon(WeaponManager.Instance.defaultWeapon);
+        }
+
+        if (playerHand != null)
+        {
+            originalHandX = playerHand.localPosition.x;
+        }
+
     }
 
     void Update()
     {
-        if (isDead || !canMove) return;  // 이동 제한 추가
+        if (isDead || !canMove) return;
 
-        HandleInput();
+        RotateWeaponToMouse(weaponHolder.currentWeapon);
+        HandleMovementInput();
+        HandleMouseDirection();
         HandleAnimation();
+
+        // 공격 (마우스 좌 클릭)
+        if (Input.GetMouseButton(0))
+        {
+            WeaponManager.Instance.weaponHolder.Attack();
+        }
+
+        // 무기 교체 입력 (E키)
+        if (Input.GetKeyDown(KeyCode.E))
+        {
+            WeaponManager.Instance.SwitchWeapon();
+        }
+
     }
 
     void FixedUpdate()
     {
-        if (isDead || !canMove) return;  // 이동 제한 추가
+        if (isDead || !canMove)
+        {
+            rb.linearVelocity = Vector2.zero;
+            return;
+        }
+
         rb.linearVelocity = moveInput * moveSpeed;
     }
 
-    /// <summary>
-    /// 플레이어 기본 이동 구현
-    /// </summary>
-    void HandleInput()
-    {
-        float moveX = Input.GetAxisRaw("Horizontal");
-        float moveY = Input.GetAxisRaw("Vertical");
-        moveInput = new Vector2(moveX, moveY).normalized;
 
-        // 좌우 방향 전환
-        if (moveX > 0)
-            spriteRenderer.flipX = false;
-        else if (moveX < 0)
-            spriteRenderer.flipX = true;
+
+    //============================================================
+    // INPUT
+    //============================================================
+
+    private void HandleMovementInput()
+    {
+        float x = Input.GetAxisRaw("Horizontal");
+        float y = Input.GetAxisRaw("Vertical");
+        moveInput = new Vector2(x, y).normalized;
     }
 
-    /// <summary>
-    /// 이동 애니메이션 처리
-    /// </summary>
-    void HandleAnimation()
+    private void HandleMouseDirection()
     {
-        animator.SetBool("isRunning", moveInput.magnitude > 0);
+        if (playerHand == null) return;
+
+        Vector3 mouse = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        mouse.z = 0;
+
+        Vector2 dir = (mouse - transform.position).normalized;
+
+        // 캐릭터 flip
+        spriteRenderer.flipX = dir.x < 0;
+
+        // 무기 손 위치 flip (좌우 대칭)
+        playerHand.localPosition = new Vector3(
+            Mathf.Abs(originalHandX) * (dir.x >= 0 ? 1 : -1),
+            playerHand.localPosition.y,
+            0
+        );
     }
 
-    /// <summary>
-    /// 피격 처리
-    /// </summary>
-    public void OnHit(int damage)
+    private void HandleAnimation()
     {
-        if (isDead || isHit) return;
-
-        currentHP -= damage;
-        Debug.Log($"플레이어 피해: {damage}, 현재 HP: {currentHP}");
-
-        isHit = true;
-        animator.SetBool("isHit", true);
-
-        Invoke(nameof(ResetHit), 0.3f);
-
-        if (currentHP <= 0)
-            OnDie();
+        animator.SetBool("isRunning", moveInput.sqrMagnitude > 0);
     }
 
-    void ResetHit()
-    {
-        isHit = false;
-        animator.SetBool("isHit", false);
-    }
+    //============================================================
+    // DAMAGE / HP
+    //============================================================
 
-    /// <summary>
-    /// 사망 처리
-    /// </summary>
-    public void OnDie()
+    public void OnHit(int dmg)
     {
         if (isDead) return;
 
-        isDead = true;
-        rb.linearVelocity = Vector2.zero;
-        animator.SetTrigger("isDie");
-        Debug.Log("플레이어 사망 애니메이션 발동");
-    }
-    public void SetCanMove(bool value)
-    {
-        canMove = value;
-        if (!value) rb.linearVelocity = Vector2.zero;
+        currentHP -= dmg;
+        animator.SetTrigger("Hit");
+
+        if (currentHP <= 0)
+        {
+            Die();
+        }
     }
 
-    public void MoveToRoom(Room nextRoom, Transform spawnDoor)
+    private void Die()
     {
-        StartCoroutine(MoveRoomRoutine(nextRoom, spawnDoor));
+        isDead = true;
+        rb.linearVelocity = Vector2.zero;
+        animator.SetTrigger("Die");
+    }
+
+    //============================================================
+    // WEAPON
+    //============================================================
+
+    public void RotateWeaponToMouse(WeaponBase weapon)
+    {
+        if (weapon == null) return;
+
+        Vector3 mouse = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        mouse.z = 0;
+
+        Vector2 dir = mouse - weapon.transform.position;
+        float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+
+        weapon.transform.rotation = Quaternion.Euler(0, 0, angle);
+
+        // 좌우 반전 고려 (필요하면)
+        float scaleX = Mathf.Sign(transform.localScale.x);
+        weapon.transform.localScale = new Vector3(scaleX, 1, 1);
+    }
+
+    //public void RotateWeaponToMouse()
+    //{
+    //    if (weaponHolder == null || weaponHolder.currentWeapon == null) return;
+
+    //    Transform w = weaponHolder.currentWeapon.transform;
+
+    //    Vector3 mouse = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+    //    mouse.z = 0;
+
+    //    Vector3 dir = mouse - w.position;
+    //    float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+
+    //    // 플레이어 좌우 반전 보정
+    //    float scaleX = Mathf.Sign(transform.localScale.x);
+    //    if (scaleX < 0) angle = 180 - angle;
+
+    //    w.rotation = Quaternion.Euler(0, 0, angle);
+
+    //    // 좌우 반전 적용
+    //    w.localScale = new Vector3(scaleX, 1, 1);
+    //}
+
+
+    //private void RotateWeaponToMouse()
+    //{
+    //    if (playerHand == null) return;
+
+    //    Vector3 mouse = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+    //    mouse.z = 0;
+
+    //    Vector2 dir = mouse - playerHand.position;
+    //    float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+
+    //    playerHand.rotation = Quaternion.Euler(0, 0, angle);
+    //}
+
+
+    //============================================================
+    // MOVEMENT LOCK
+    //============================================================
+
+    public void SetCanMove(bool v)
+    {
+        canMove = v;
+        if (!v)
+            rb.linearVelocity = Vector2.zero;
+    }
+
+    //============================================================
+    // ROOM 이동 루틴 (원본 그대로 유지 + 안정화)
+    //============================================================
+
+    public void MoveToRoom(Room next, Transform spawnPoint)
+    {
+        StartCoroutine(MoveRoomRoutine(next, spawnPoint));
     }
 
     private IEnumerator MoveRoomRoutine(Room nextRoom, Transform spawnDoor)
     {
-        SetCanMove(false); // 이동 잠금
+        SetCanMove(false);
+
         rb.linearVelocity = Vector2.zero;
 
         // 카메라 이동
-        Camera.main.transform.position = new Vector3(nextRoom.transform.position.x, nextRoom.transform.position.y, Camera.main.transform.position.z);
+        Camera.main.transform.position = new Vector3(
+            nextRoom.transform.position.x,
+            nextRoom.transform.position.y,
+            Camera.main.transform.position.z
+        );
 
-        // 플레이어 위치 이동
+        // 플레이어를 방 입구로 이동
         transform.position = spawnDoor.position;
 
-        // 현재 방 갱신
         currentRoom = nextRoom;
 
-        yield return new WaitForSeconds(0.2f); // 살짝 딜레이 후 이동 가능
+        yield return new WaitForSeconds(0.2f);
+
         SetCanMove(true);
     }
 
+    //============================================================
+    // DEBUG
+    //============================================================
+
+    private void OnDrawGizmosSelected()
+    {
+        if (playerHand == null) return;
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(playerHand.position, 0.4f);
+    }
 }

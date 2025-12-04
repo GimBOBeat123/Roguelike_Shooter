@@ -5,18 +5,11 @@ public class Door : MonoBehaviour
     public enum DoorDirection { Up, Down, Left, Right }
     public DoorDirection direction;
 
-    private Map map;
-
-    void Start()
+    private void OnTriggerEnter2D(Collider2D other)
     {
-        map = FindObjectOfType<Map>();
-    }
-
-    private void OnTriggerEnter2D(Collider2D collision)
-    {
-        if (collision.CompareTag("Player"))
+        if (other.CompareTag("Player") && Map.Instance != null && Map.Instance.CanTransition)
         {
-            map.MoveToNextRoom(direction);
+            Map.Instance.MoveToNextRoom(direction);
         }
     }
 }

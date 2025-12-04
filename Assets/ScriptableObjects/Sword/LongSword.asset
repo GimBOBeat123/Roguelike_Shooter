@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 019356b25ab6af64eba84388ad0fe84f, type: 3}
+  m_Name: LongSword
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponData
+  weaponName: LongSword
+  sprite: {fileID: 7680820834086852892, guid: c83223470f508d64ba24ec31c2077cad, type: 3}
+  weaponType: 0
+  weaponPrefab: {fileID: 1297735171174509902, guid: 18b7f716ab4077f48946463266ec7e27, type: 3}
+  damage: 15
+  attackSpeed: 8
+  attackDistance: 0.5
+  bulletSpeed: 0
+  bulletPrefab: {fileID: 4324176232266112050, guid: 668145eaae7dda44590c692f4e071b32, type: 3}
+  level: 2
